@@ -1,0 +1,17 @@
+---
+activeViewSize: 5
+arwl: 3
+self:
+  host: "0.0.0.0"
+  port: 1200
+  analyticsPort: 1300
+bootstrapPeers:
+  - host: "0.0.0.0"
+    port: 1200
+    analyticsPort: 1300
+dialTimeoutMiliseconds: 8000
+logFolder: /tmp/logs/
+shuffleTimerSeconds: 7
+debugTimerDurationSeconds: 5
+l: 5
+cacheViewSize: 13
