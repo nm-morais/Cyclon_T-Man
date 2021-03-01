@@ -101,11 +101,11 @@ func (v *View) isFull() bool {
 	return len(v.asArr) >= v.capacity
 }
 
-func (v *View) toArray() []*PeerState {
+func (v *View) toArray() PeerStateArr {
 	return v.asArr
 }
 
-func (v *View) getRandomElementsFromView(amount int, exclusions ...peer.Peer) []*PeerState {
+func (v *View) getRandomElementsFromView(amount int, exclusions ...peer.Peer) PeerStateArr {
 	viewAsArr := v.toArray()
 	perm := rand.Perm(len(viewAsArr))
 	rndElements := []*PeerState{}

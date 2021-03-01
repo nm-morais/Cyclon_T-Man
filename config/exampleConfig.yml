@@ -15,3 +15,6 @@ shuffleTimerSeconds: 7
 debugTimerDurationSeconds: 5
 l: 5
 cacheViewSize: 13
+tManViewSize: 7
+tManFanout: 4
+tManTimerSeconds: 10

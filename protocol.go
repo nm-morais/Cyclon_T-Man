@@ -39,7 +39,7 @@ type CyclonTManConfig struct {
 	DialTimeoutMiliseconds int    `yaml:"dialTimeoutMiliseconds"`
 	LogFolder              string `yaml:"logFolder"`
 	CacheViewSize          int    `yaml:"cacheViewSize"`
-	TManViewSize           int    `yaml:"cacheViewSize"`
+	TManViewSize           int    `yaml:"tManViewSize"`
 	TManFanout             int    `yaml:"tManFanout"`
 	ShuffleTimeSeconds     int    `yaml:"shuffleTimerSeconds"`
 	TManTimerSeconds       int    `yaml:"tManTimerSeconds"`
@@ -54,7 +54,7 @@ type CyclonTMan struct {
 	bootstrapNodes         []peer.Peer
 	cyclonView             *View
 	tManView               *View
-	onGoingTmanExchange    bool
+	measuringNodes         map[string]bool
 	pendingCyclonExchanges map[string][]*PeerState
 }
 
@@ -83,7 +83,7 @@ func NewCyclonTManProtocol(babel protocolManager.ProtocolManager, nw nodeWatcher
 		bootstrapNodes:         bootstrapNodes,
 		cyclonView:             &View{capacity: conf.CacheViewSize, asArr: []*PeerState{}, asMap: map[string]*PeerState{}},
 		tManView:               &View{capacity: conf.TManViewSize, asArr: []*PeerState{}, asMap: map[string]*PeerState{}},
-		onGoingTmanExchange:    false,
+		measuringNodes:         make(map[string]bool),
 		pendingCyclonExchanges: make(map[string][]*PeerState),
 	}
 }
@@ -103,17 +103,14 @@ func (c *CyclonTMan) Logger() *logrus.Logger {
 func (c *CyclonTMan) Init() {
 	// CYCLON
 	c.babel.RegisterTimerHandler(protoID, ShuffleTimerID, c.HandleShuffleTimer)
-	c.babel.RegisterMessageHandler(protoID, ShuffleMessage{}, c.HandleShuffleMessage)
-	c.babel.RegisterMessageHandler(protoID, ShuffleMessageReply{}, c.HandleShuffleMessageReply)
-
-	c.babel.RegisterTimerHandler(protoID, ShuffleTimerID, c.HandleShuffleTimer)
-	c.babel.RegisterMessageHandler(protoID, TManGossipMsg{}, c.HandleTManGossipMessage)
-	c.babel.RegisterMessageHandler(protoID, tManGossipMsgReply{}, c.HandleTManGossipMessageReply)
-	c.babel.RegisterNotificationHandler(protoID, PeerMeasuredNotification{}, c.handlePeerMeasuredNotification)
+	c.babel.RegisterMessageHandler(protoID, &ShuffleMessage{}, c.HandleShuffleMessage)
+	c.babel.RegisterMessageHandler(protoID, &ShuffleMessageReply{}, c.HandleShuffleMessageReply)
 
 	// T-MAN
 	c.babel.RegisterTimerHandler(protoID, GossipTimerID, c.HandleGossipTimer)
-
+	c.babel.RegisterMessageHandler(protoID, &TManGossipMsg{}, c.HandleTManGossipMessage)
+	c.babel.RegisterMessageHandler(protoID, tManGossipMsgReply{}, c.HandleTManGossipMessageReply)
+	c.babel.RegisterNotificationHandler(protoID, PeerMeasuredNotification{}, c.handlePeerMeasuredNotification)
 }
 
 func (c *CyclonTMan) Start() {
@@ -126,7 +123,6 @@ func (c *CyclonTMan) Start() {
 			}, false)
 		}
 	}
-
 	c.babel.RegisterPeriodicTimer(c.ID(), ShuffleTimer{duration: time.Duration(c.conf.ShuffleTimeSeconds) * time.Second})
 	c.babel.RegisterPeriodicTimer(c.ID(), GossipTimer{time.Duration(c.conf.TManTimerSeconds) * time.Second})
 }
@@ -161,17 +157,16 @@ func (c *CyclonTMan) HandleShuffleTimer(t timer.Timer) {
 }
 
 func (c *CyclonTMan) HandleShuffleMessage(sender peer.Peer, msg message.Message) {
-	shuffleMsg := msg.(ShuffleMessage)
+	shuffleMsg := msg.(*ShuffleMessage)
 	c.logger.Infof("Received shuffle message %+v from %s", shuffleMsg, sender)
 	peersToReply := c.cyclonView.getRandomElementsFromView(len(shuffleMsg.peers), shuffleMsg.peers...)
 	toSend := NewShuffleMsgReply(peersToReply)
 	c.sendMessageTmpTransport(toSend, sender)
 	c.mergeCyclonViewWith(shuffleMsg.ToPeerStateArr(), peersToReply, sender)
-
 }
 
 func (c *CyclonTMan) HandleShuffleMessageReply(sender peer.Peer, msg message.Message) {
-	shuffleMsgReply := msg.(ShuffleMessageReply)
+	shuffleMsgReply := msg.(*ShuffleMessageReply)
 	c.logger.Infof("Received shuffle reply message %+v from %s", shuffleMsgReply, sender)
 	c.mergeCyclonViewWith(shuffleMsgReply.ToPeerStateArr(), c.pendingCyclonExchanges[sender.String()], sender)
 	delete(c.pendingCyclonExchanges, sender.String())
@@ -205,6 +200,11 @@ func (c *CyclonTMan) mergeCyclonViewWith(sample []*PeerState, sentPeers []*PeerS
 		}
 
 		c.cyclonView.add(p, true)
+		if c.tManView.size() == 0 && c.cyclonView.size() >= c.conf.TManViewSize && len(c.measuringNodes) == 0 { // initialize T-Man
+			rndSample := c.cyclonView.getRandomElementsFromView(c.conf.TManViewSize)
+			c.issueMeasurementsFor(rndSample.ToPeerArr())
+			return
+		}
 	}
 	c.logCyclonTManState()
 }
@@ -215,28 +215,29 @@ func (c *CyclonTMan) HandleGossipTimer(t timer.Timer) {
 	c.logger.Info("Gossip timer trigger")
 
 	if c.tManView.size() == 0 {
+		c.logger.Info("Returning brecuase tMan view is 0")
 		return
 	}
 
-	if c.onGoingTmanExchange {
-		return
-	}
-
-	c.onGoingTmanExchange = true
-	sort.Sort(c.tManView.asArr)
+	sort.SliceStable(c.tManView.asArr, func(i, j int) bool { return c.tManView.asArr[i].age < c.tManView.asArr[j].age })
 	p := c.tManView.asArr[0]
 	toSend := NewTManGossipMsg(c.makeTManBuf())
 	c.sendMessageTmpTransport(toSend, p)
+	c.logger.Infof("Sending t-man gossip message %+v to %s", toSend, p)
 }
 
+// array must be sorted
 func (c *CyclonTMan) makeTManBuf() []peer.Peer {
-	sort.Sort(c.tManView.asArr)
 	nrPeersToSend := c.conf.TManFanout
-	if len(c.tManView.asArr) < nrPeersToSend {
-		nrPeersToSend = len(c.tManView.asArr)
+	if len(c.tManView.asArr)-1 < nrPeersToSend {
+		nrPeersToSend = len(c.tManView.asArr) - 1
 	}
-	buffer := append(c.tManView.asArr[:nrPeersToSend].ToPeerArr(), c.babel.SelfPeer())
-	rndElems := c.cyclonView.getRandomElementsFromView(c.conf.TManFanout)
+	buffer := []peer.Peer{}
+	if len(c.tManView.asArr) > 0 && nrPeersToSend > 0 {
+		buffer = append(buffer, c.tManView.asArr[1:nrPeersToSend].ToPeerArr()...)
+	}
+	buffer = append(buffer, c.babel.SelfPeer())
+	rndElems := c.cyclonView.getRandomElementsFromView(c.conf.TManFanout, buffer...)
 	for _, p := range rndElems {
 		buffer = append(buffer, p.Peer)
 	}
@@ -244,9 +245,17 @@ func (c *CyclonTMan) makeTManBuf() []peer.Peer {
 }
 
 func (c *CyclonTMan) HandleTManGossipMessage(sender peer.Peer, msg message.Message) {
-	gossipMsg := msg.(TManGossipMsg)
+	gossipMsg := msg.(*TManGossipMsg)
 	c.logger.Infof("Received TMan gossip message %+v from %s", gossipMsg, sender)
 	c.issueMeasurementsFor(gossipMsg.peers)
+	sort.Sort(c.tManView.asArr)
+	nrPeersToSend := c.conf.TManFanout
+	if len(c.tManView.asArr) < nrPeersToSend {
+		nrPeersToSend = len(c.tManView.asArr)
+	}
+	toSend := NewTManGossipMsgReply(c.tManView.asArr[:nrPeersToSend])
+	c.sendMessageTmpTransport(toSend, sender)
+	c.logger.Infof("Sending t-man gossip message reply %+v to %s", toSend, sender)
 }
 
 func (c *CyclonTMan) HandleTManGossipMessageReply(sender peer.Peer, msg message.Message) {
@@ -260,9 +269,15 @@ func (c *CyclonTMan) handlePeerMeasuredNotification(n notification.Notification)
 	peerMeasured := peerMeasuredNotification.peerMeasured
 	peerMeasuredNInfo, err := c.nodeWatcher.GetNodeInfo(peerMeasured)
 	defer c.nodeWatcher.Unwatch(peerMeasured, c.ID())
+	defer delete(c.measuringNodes, peerMeasured.String())
 	if err != nil {
 		c.logger.Errorf("peer was %s not being measured", peerMeasured.String())
 		return
+	}
+	for _, p2 := range c.tManView.asArr {
+		if peer.PeersEqual(peerMeasured, p2) {
+			return
+		}
 	}
 	c.logger.Infof("Peer measured: %s:%+v", peerMeasured.String(), peerMeasuredNInfo.LatencyCalc().CurrValue())
 	// measurements such that active peers have known costs
@@ -272,15 +287,27 @@ func (c *CyclonTMan) handlePeerMeasuredNotification(n notification.Notification)
 		age:  uint16(measuredScore),
 	}
 	c.tManView.asArr = append(c.tManView.asArr, aux)
-	sort.Sort(c.tManView.asArr)
+	sort.SliceStable(c.tManView.asArr, func(i, j int) bool { return c.tManView.asArr[i].age < c.tManView.asArr[j].age })
 	if len(c.tManView.asArr) > c.tManView.capacity {
-		c.tManView.asArr = c.tManView.asArr[:c.cyclonView.capacity]
+		c.tManView.asArr = c.tManView.asArr[:c.tManView.capacity]
 	}
 	c.logTManState()
 }
 
 func (c *CyclonTMan) issueMeasurementsFor(peers []peer.Peer) {
+outer:
 	for _, p := range peers {
+		if _, ok := c.measuringNodes[p.String()]; ok {
+			continue
+		}
+		if peer.PeersEqual(p, c.babel.SelfPeer()) {
+			continue
+		}
+		for _, p2 := range c.tManView.asArr {
+			if peer.PeersEqual(p, p2) {
+				continue outer
+			}
+		}
 		c.nodeWatcher.Watch(p, c.ID())
 		condition := nodeWatcher.Condition{
 			Repeatable:                false,
@@ -292,6 +319,7 @@ func (c *CyclonTMan) issueMeasurementsFor(peers []peer.Peer) {
 			ProtoId:                   c.ID(),
 		}
 		c.nodeWatcher.NotifyOnCondition(condition)
+		c.measuringNodes[p.String()] = true
 	}
 }
 
@@ -352,9 +380,9 @@ func (c *CyclonTMan) logTManState() {
 	var toLog string
 	toLog = "T-Man view : "
 
-	for idx, p := range c.cyclonView.asArr {
+	for idx, p := range c.tManView.asArr {
 		toLog += fmt.Sprintf("%s:%d", p.String(), p.age)
-		if idx < len(c.cyclonView.asArr)-1 {
+		if idx < len(c.tManView.asArr)-1 {
 			toLog += ", "
 		}
 	}

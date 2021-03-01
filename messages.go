@@ -15,7 +15,7 @@ type ShuffleMessage struct {
 }
 type shuffleMessageSerializer struct{}
 
-func NewShuffleMsg(peers []*PeerState) ShuffleMessage {
+func NewShuffleMsg(peers []*PeerState) *ShuffleMessage {
 
 	peerArr := make([]peer.Peer, len(peers))
 	ages := make([]uint16, len(peers))
@@ -24,7 +24,7 @@ func NewShuffleMsg(peers []*PeerState) ShuffleMessage {
 		ages[idx] = uint16(p.age)
 	}
 
-	return ShuffleMessage{
+	return &ShuffleMessage{
 		peers: peerArr,
 		ages:  ages,
 	}
@@ -32,11 +32,11 @@ func NewShuffleMsg(peers []*PeerState) ShuffleMessage {
 
 var defaultShuffleMsgSerializer = shuffleMessageSerializer{}
 
-func (ShuffleMessage) Type() message.ID                   { return ShuffleMessageType }
-func (ShuffleMessage) Serializer() message.Serializer     { return defaultShuffleMsgSerializer }
-func (ShuffleMessage) Deserializer() message.Deserializer { return defaultShuffleMsgSerializer }
+func (*ShuffleMessage) Type() message.ID                   { return ShuffleMessageType }
+func (*ShuffleMessage) Serializer() message.Serializer     { return defaultShuffleMsgSerializer }
+func (*ShuffleMessage) Deserializer() message.Deserializer { return defaultShuffleMsgSerializer }
 func (shuffleMessageSerializer) Serialize(msg message.Message) []byte {
-	shuffleMsg := msg.(ShuffleMessage)
+	shuffleMsg := msg.(*ShuffleMessage)
 	peersBytes := peer.SerializePeerArray(shuffleMsg.peers)
 	ageBytes := make([]byte, 2*len(shuffleMsg.peers))
 	curr := 0
@@ -53,7 +53,7 @@ func (shuffleMessageSerializer) Deserialize(msgBytes []byte) message.Message {
 		ages[i] = binary.BigEndian.Uint16(msgBytes[curr:])
 		curr += 2
 	}
-	return ShuffleMessage{
+	return &ShuffleMessage{
 		peers: peers,
 		ages:  ages,
 	}
@@ -79,7 +79,7 @@ type ShuffleMessageReply struct {
 
 type shuffleMessageReplySerializer struct{}
 
-func NewShuffleMsgReply(peers []*PeerState) ShuffleMessageReply {
+func NewShuffleMsgReply(peers []*PeerState) *ShuffleMessageReply {
 	peerArr := make([]peer.Peer, len(peers))
 	ages := make([]uint16, len(peers))
 	for idx, p := range peers {
@@ -87,7 +87,7 @@ func NewShuffleMsgReply(peers []*PeerState) ShuffleMessageReply {
 		ages[idx] = uint16(p.age)
 	}
 
-	return ShuffleMessageReply{
+	return &ShuffleMessageReply{
 		peers: peerArr,
 		ages:  ages,
 	}
@@ -95,13 +95,13 @@ func NewShuffleMsgReply(peers []*PeerState) ShuffleMessageReply {
 
 var defaultShuffleMsgReplySerializer = shuffleMessageReplySerializer{}
 
-func (ShuffleMessageReply) Type() message.ID               { return ShuffleMessageReplyType }
-func (ShuffleMessageReply) Serializer() message.Serializer { return defaultShuffleMsgReplySerializer }
-func (ShuffleMessageReply) Deserializer() message.Deserializer {
+func (*ShuffleMessageReply) Type() message.ID               { return ShuffleMessageReplyType }
+func (*ShuffleMessageReply) Serializer() message.Serializer { return defaultShuffleMsgReplySerializer }
+func (*ShuffleMessageReply) Deserializer() message.Deserializer {
 	return defaultShuffleMsgReplySerializer
 }
 func (shuffleMessageReplySerializer) Serialize(msg message.Message) []byte {
-	shuffleMsg := msg.(ShuffleMessageReply)
+	shuffleMsg := msg.(*ShuffleMessageReply)
 	peersBytes := peer.SerializePeerArray(shuffleMsg.peers)
 	ageBytes := make([]byte, 2*len(shuffleMsg.peers))
 	curr := 0
@@ -118,7 +118,7 @@ func (shuffleMessageReplySerializer) Deserialize(msgBytes []byte) message.Messag
 		ages[i] = binary.BigEndian.Uint16(msgBytes[curr:])
 		curr += 2
 	}
-	return ShuffleMessageReply{
+	return &ShuffleMessageReply{
 		peers: peers,
 		ages:  ages,
 	}
@@ -142,80 +142,66 @@ type TManGossipMsg struct {
 }
 type TManGossipMsgSerializer struct{}
 
-func NewTManGossipMsg(peers []peer.Peer) TManGossipMsg {
-	return TManGossipMsg{
+func NewTManGossipMsg(peers []peer.Peer) *TManGossipMsg {
+	return &TManGossipMsg{
 		peers: peers,
 	}
 }
 
-var tManGossipMsg = TManGossipMsgSerializer{}
+var tManGossipMsgSerializer = &TManGossipMsgSerializer{}
 
-func (TManGossipMsg) Type() message.ID                   { return TManGossipMsgType }
-func (TManGossipMsg) Serializer() message.Serializer     { return tManGossipMsg }
-func (TManGossipMsg) Deserializer() message.Deserializer { return tManGossipMsg }
-func (TManGossipMsgSerializer) Serialize(msg message.Message) []byte {
-	shuffleMsg := msg.(TManGossipMsg)
+func (*TManGossipMsg) Type() message.ID                   { return TManGossipMsgType }
+func (*TManGossipMsg) Serializer() message.Serializer     { return tManGossipMsgSerializer }
+func (*TManGossipMsg) Deserializer() message.Deserializer { return tManGossipMsgSerializer }
+func (*TManGossipMsgSerializer) Serialize(msg message.Message) []byte {
+	shuffleMsg := msg.(*TManGossipMsg)
 	peersBytes := peer.SerializePeerArray(shuffleMsg.peers)
 	ageBytes := make([]byte, 2*len(shuffleMsg.peers))
 	return append(peersBytes, ageBytes...)
 }
 func (TManGossipMsgSerializer) Deserialize(msgBytes []byte) message.Message {
 	_, peers := peer.DeserializePeerArray(msgBytes)
-	return ShuffleMessage{
+	return &TManGossipMsg{
 		peers: peers,
 	}
 }
 
-const tManGossipMsgReplyType = 2001
+const tManGossipMsgReplyType = 2003
 
 type tManGossipMsgReply struct {
 	peers []peer.Peer
-	ages  []uint16
 }
 
 type tManGossipMsgReplySerializer struct{}
 
 func NewTManGossipMsgReply(peers []*PeerState) tManGossipMsgReply {
 	peerArr := make([]peer.Peer, len(peers))
-	ages := make([]uint16, len(peers))
 	for idx, p := range peers {
 		peerArr[idx] = p.Peer
-		ages[idx] = uint16(p.age)
 	}
 
 	return tManGossipMsgReply{
 		peers: peerArr,
-		ages:  ages,
 	}
 }
 
-var defaultGossipMsgSerializer = shuffleMessageReplySerializer{}
+var defaultGossipMsgSerializer = tManGossipMsgReplySerializer{}
 
-func (tManGossipMsgReply) Type() message.ID               { return tManGossipMsgReplyType }
-func (tManGossipMsgReply) Serializer() message.Serializer { return defaultGossipMsgSerializer }
+func (tManGossipMsgReply) Type() message.ID { return tManGossipMsgReplyType }
+func (tManGossipMsgReply) Serializer() message.Serializer {
+	return defaultGossipMsgSerializer
+}
 func (tManGossipMsgReply) Deserializer() message.Deserializer {
 	return defaultGossipMsgSerializer
 }
-func (tManGossipMsgReply) Serialize(msg message.Message) []byte {
-	shuffleMsg := msg.(tManGossipMsgReply)
-	peersBytes := peer.SerializePeerArray(shuffleMsg.peers)
-	ageBytes := make([]byte, 2*len(shuffleMsg.peers))
-	curr := 0
-	for _, v := range shuffleMsg.ages {
-		binary.BigEndian.PutUint16(ageBytes[curr:], v)
-		curr += 2
-	}
-	return append(peersBytes, ageBytes...)
+func (tManGossipMsgReplySerializer) Serialize(msg message.Message) []byte {
+	gossipMsg := msg.(tManGossipMsgReply)
+	peersBytes := peer.SerializePeerArray(gossipMsg.peers)
+	return peersBytes
 }
-func (tManGossipMsgReply) Deserialize(msgBytes []byte) message.Message {
-	curr, peers := peer.DeserializePeerArray(msgBytes)
-	ages := make([]uint16, len(peers))
-	for i := 0; i < len(peers); i++ {
-		ages[i] = binary.BigEndian.Uint16(msgBytes[curr:])
-		curr += 2
-	}
+func (tManGossipMsgReplySerializer) Deserialize(msgBytes []byte) message.Message {
+	_, peers := peer.DeserializePeerArray(msgBytes)
 	return tManGossipMsgReply{
 		peers: peers,
-		ages:  ages,
 	}
 }
