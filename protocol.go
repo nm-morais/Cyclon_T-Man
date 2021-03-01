@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -101,6 +102,7 @@ func (c *CyclonTMan) Logger() *logrus.Logger {
 }
 
 func (c *CyclonTMan) Init() {
+	c.babel.RegisterTimerHandler(protoID, DebugTimerID, c.HandleDebugTimer)
 	// CYCLON
 	c.babel.RegisterTimerHandler(protoID, ShuffleTimerID, c.HandleShuffleTimer)
 	c.babel.RegisterMessageHandler(protoID, &ShuffleMessage{}, c.HandleShuffleMessage)
@@ -123,6 +125,7 @@ func (c *CyclonTMan) Start() {
 			}, false)
 		}
 	}
+	c.babel.RegisterPeriodicTimer(c.ID(), DebugTimer{duration: time.Duration(5 * time.Second)})
 	c.babel.RegisterPeriodicTimer(c.ID(), ShuffleTimer{duration: time.Duration(c.conf.ShuffleTimeSeconds) * time.Second})
 	c.babel.RegisterPeriodicTimer(c.ID(), GossipTimer{time.Duration(c.conf.TManTimerSeconds) * time.Second})
 }
@@ -206,7 +209,6 @@ func (c *CyclonTMan) mergeCyclonViewWith(sample []*PeerState, sentPeers []*PeerS
 			return
 		}
 	}
-	c.logCyclonTManState()
 }
 
 // ---------------- t-MAN ----------------
@@ -242,6 +244,28 @@ func (c *CyclonTMan) makeTManBuf() []peer.Peer {
 		buffer = append(buffer, p.Peer)
 	}
 	return buffer
+}
+
+func (c *CyclonTMan) logInView() {
+	type viewWithLatencies []struct {
+		IP      string `json:"ip,omitempty"`
+		Latency int    `json:"latency,omitempty"`
+	}
+	toPrint := viewWithLatencies{}
+	for _, p := range c.tManView.asArr {
+		toPrint = append(toPrint, struct {
+			IP      string "json:\"ip,omitempty\""
+			Latency int    "json:\"latency,omitempty\""
+		}{
+			IP:      p.IP().String(),
+			Latency: int(p.age),
+		})
+	}
+	res, err := json.Marshal(toPrint)
+	if err != nil {
+		panic(err)
+	}
+	c.logger.Infof("<inView> %s", string(res))
 }
 
 func (c *CyclonTMan) HandleTManGossipMessage(sender peer.Peer, msg message.Message) {
@@ -326,7 +350,9 @@ outer:
 // ---------------- timer handlers ----------------
 
 func (c *CyclonTMan) HandleDebugTimer(t timer.Timer) {
-
+	c.logTManState()
+	c.logCyclonTManState()
+	c.logInView()
 }
 
 // ---------------- Networking Handlers ----------------
