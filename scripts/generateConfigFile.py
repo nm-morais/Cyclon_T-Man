@@ -68,7 +68,7 @@ for i, ip in enumerate(reversed(ips)):
         added += 1
         f.write(f"{ip} node{i}\n")
 
-    if added == 50:
+    if added == 120:
         break
 f.close()
 

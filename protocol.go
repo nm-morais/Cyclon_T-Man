@@ -134,8 +134,16 @@ func (c *CyclonTMan) Start() {
 
 func (c *CyclonTMan) HandleShuffleTimer(t timer.Timer) {
 	if c.cyclonView.size() == 0 {
-		c.logger.Info("Returning due to having no neighbors")
-		return
+		if c.selfIsBootstrap {
+			return
+		}
+		c.logger.Warn("Had no neighbors in shuffle reply, adding bootstrap peer")
+		for _, bootstrap := range c.bootstrapNodes {
+			c.cyclonView.add(&PeerState{
+				Peer: bootstrap,
+				age:  0,
+			}, false)
+		}
 	}
 
 	for _, p := range c.cyclonView.asArr {
@@ -146,7 +154,7 @@ func (c *CyclonTMan) HandleShuffleTimer(t timer.Timer) {
 	q := viewAsArr[0]
 	c.logger.Infof("Oldest level peer: %s:%d", q.Peer.String(), q.age)
 	if _, ok := c.pendingCyclonExchanges[q.String()]; ok {
-		return //TODO
+		delete(c.pendingCyclonExchanges, q.String())
 	}
 	subset := append(c.cyclonView.getRandomElementsFromView(c.conf.L-1, q), &PeerState{
 		Peer: c.babel.SelfPeer(),
@@ -201,13 +209,7 @@ func (c *CyclonTMan) mergeCyclonViewWith(sample []*PeerState, sentPeers []*PeerS
 			}
 			sentPeers = sentPeers[1:]
 		}
-
 		c.cyclonView.add(p, true)
-		if c.tManView.size() == 0 && c.cyclonView.size() >= c.conf.TManViewSize && len(c.measuringNodes) == 0 { // initialize T-Man
-			rndSample := c.cyclonView.getRandomElementsFromView(c.conf.TManViewSize)
-			c.issueMeasurementsFor(rndSample.ToPeerArr())
-			return
-		}
 	}
 }
 
@@ -217,6 +219,11 @@ func (c *CyclonTMan) HandleGossipTimer(t timer.Timer) {
 	c.logger.Info("Gossip timer trigger")
 
 	if c.tManView.size() == 0 {
+		if c.tManView.size() == 0 && c.cyclonView.size() >= c.conf.TManViewSize && len(c.measuringNodes) == 0 { // initialize T-Man
+			rndSample := c.cyclonView.getRandomElementsFromView(c.conf.TManViewSize)
+			c.issueMeasurementsFor(rndSample.ToPeerArr())
+			return
+		}
 		c.logger.Info("Returning brecuase tMan view is 0")
 		return
 	}

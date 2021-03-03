@@ -77,6 +77,12 @@ def parse_args():
     return args
 
 
+def extractJsonFromLine(line, tag):
+    line_cut = line[line.index(tag) + len(tag) + 1:len(line) - 1]
+    line_cut = line_cut.replace("\\", "")
+    return json.loads(line_cut)
+
+
 def extractInView(line):
     # print("line", line)
     line_cut = line[line.index(inview_tag) + len(inview_tag) + 1:len(line) - 1]
@@ -99,18 +105,52 @@ def parse_file(file, node_ip, node_infos, latency_map):
         "degree": [],
         "latency_avg_global": [],
         "timestamp_dt": [],
+        "ctrl_msgs_sent": [],
+        "ctrl_msgs_rcvd": [],
+        "app_msgs_sent": [],
+        "app_msgs_rcvd": [],
     }
+
+    ctrl_msgs_sent = 0
+    ctrl_msgs_rcvd = 0
+    app_msgs_rcvd = 0
+    app_msgs_sent = 0
 
     for aux in f.readlines():
         line = aux.strip()
+        levelStr = " level="
+        timeStr = "time="
+
+        try:
+            if "<control-messages-stats>" in line:
+                stats = extractJsonFromLine(line, "<control-messages-stats>")
+                ctrl_msgs_rcvd = stats["ControlMessagesReceived"]
+                ctrl_msgs_sent = stats["ControlMessagesSent"]
+                # print(ctrl_msgs_rcvd)
+                pass
+
+            if "<app-messages-stats>" in line:
+                stats = extractJsonFromLine(line, "<app-messages-stats>")
+                app_msgs_rcvd = stats["ApplicationalMessagesReceived"]
+                app_msgs_sent = stats["ApplicationalMessagesSent"]
+                app_msgs_sent = app_msgs_sent["1000"]
+                app_msgs_rcvd = app_msgs_rcvd["1000"]
+                # print(stats)
+                pass
+        except Exception as e:
+            print(e)
+
         if inview_tag in line:
-            levelStr = " level="
-            timeStr = "time="
             ts = line[line.find(timeStr) + len(timeStr) + 1:]
             ts = ts[:line.find(levelStr) - len(levelStr) - 1]
             ts_parsed = parse(ts)
             inView = extractInView(line)
             if len(inView) > 0:
+                node_measurements["ctrl_msgs_rcvd"].append(ctrl_msgs_rcvd)
+                node_measurements["ctrl_msgs_sent"].append(ctrl_msgs_sent)
+                node_measurements["app_msgs_rcvd"].append(app_msgs_rcvd)
+                node_measurements["app_msgs_sent"].append(app_msgs_sent)
+
                 node_measurements["peers"].append([p["ip"] for p in inView])
                 node_measurements["latencies"].append(
                     [getLatForIpPair(p["ip"], node_ip, latency_map) for p in inView])
@@ -172,6 +212,25 @@ def plot_avg_out_degree_all_nodes_over_time(df, output_path):
     ax.grid()
     print(f"saving average degree of nodes over time to: {output_path}")
     fig.savefig(f"{output_path}degree_over_time.svg", dpi=1200)
+
+
+def plot_avg_msg_sent_all_nodes_over_time(df, output_path):
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    print(df)
+    filter = ["ctrl_msgs_sent", "ctrl_msgs_rcvd",
+              "app_msgs_sent", "app_msgs_rcvd"]
+    resampled = df[filter].resample('15s').mean()
+    print(resampled)
+    resampled.drop(resampled.tail(1).index,
+                   inplace=True)
+    resampled.plot(ax=ax)
+    ax.set(xlabel='time (s)', ylabel='number of messages',
+           title='Average number of messages sent over time')
+    ax.grid()
+    print(
+        f"saving average number of messages sent over time to: {output_path}")
+    fig.savefig(f"{output_path}msgs_over_time.svg", dpi=1200)
 
 
 def plot_topology(node_infos, coordinates, output_path):
@@ -298,6 +357,10 @@ def main():
         "degree": [],
         "peers": [],
         "coordinates": [],
+        "ctrl_msgs_sent": [],
+        "ctrl_msgs_rcvd": [],
+        "app_msgs_sent": [],
+        "app_msgs_rcvd": [],
     }
 
     for idx, k in enumerate(node_infos):
@@ -306,6 +369,12 @@ def main():
         pd_data["ip"] += node_infos[k]["ip"]
         pd_data["latency_avg"] += node_infos[k]["latency_avg"]
         pd_data["timestamp"] += node_infos[k]["timestamp_dt"]
+
+        pd_data["ctrl_msgs_sent"] += node_infos[k]["ctrl_msgs_sent"]
+        pd_data["ctrl_msgs_rcvd"] += node_infos[k]["ctrl_msgs_rcvd"]
+        pd_data["app_msgs_sent"] += node_infos[k]["app_msgs_sent"]
+        pd_data["app_msgs_rcvd"] += node_infos[k]["app_msgs_rcvd"]
+
         pd_data["latency_avg_global"] += [system_lat_avg] * \
             len(node_infos[k]["timestamp_dt"])
         pd_data["coordinates"] += [coords[k]] * \
@@ -318,16 +387,15 @@ def main():
 
     # print(df)
     print("system_lat_avg:", system_lat_avg)
-    plot_degree_hist_last_sample(
-        node_infos=node_infos, output_path=args.output_path)
+    # plot_degree_hist_last_sample(
+    #     node_infos=node_infos, output_path=args.output_path)
     plot_avg_latency_all_nodes_over_time(
         df=df, output_path=args.output_path)
-    # plot_avg_in_degree_all_nodes_over_time(
-    #     df=df, output_path=args.output_path)
     plot_avg_out_degree_all_nodes_over_time(
         df=df, output_path=args.output_path)
     plot_topology(node_infos=node_infos, coordinates=coords,
                   output_path=args.output_path)
+    plot_avg_msg_sent_all_nodes_over_time(df=df, output_path=args.output_path)
     # plotConfigMapAndConnections(node_positions, node_ids, parent_edges,
     #                             landmarks, latencies, args.output_path)
 
