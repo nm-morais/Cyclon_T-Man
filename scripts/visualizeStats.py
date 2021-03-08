@@ -9,7 +9,7 @@ from dateutil.parser import parse
 import numpy as np
 import os
 import argparse
-import statistics
+import datetime
 
 latency_collection_tag = "<latency_collection>"
 inview_tag = "<inView>"
@@ -191,7 +191,6 @@ def plot_avg_latency_all_nodes_over_time(df, output_path):
     resampled.drop(resampled.tail(1).index,
                    inplace=True)
     resampled.plot(ax=ax)
-
     ax.set(xlabel='time (s)', ylabel='latency (ms)',
            title='Average latency over time in active view')
     ax.grid()
@@ -240,6 +239,7 @@ def plot_topology(node_infos, coordinates, output_path):
     G = nx.DiGraph()
     for k in node_infos:
         curr = node_infos[k]
+        print(k)
         edges = [(k, ip) for ip in curr["peers"][-1]]
         coord_pair = (coordinates[k][0], coordinates[k][1])
         # print(str(coord_pair))
@@ -383,10 +383,10 @@ def main():
     df = pd.DataFrame(pd_data)
     df.index = df["timestamp"]
     print(df)
-    print(df["latency_avg"])
+    # print(df["latency_avg"])
 
     # print(df)
-    print("system_lat_avg:", system_lat_avg)
+    # print("system_lat_avg:", system_lat_avg)
     # plot_degree_hist_last_sample(
     #     node_infos=node_infos, output_path=args.output_path)
     plot_avg_latency_all_nodes_over_time(
@@ -395,9 +395,19 @@ def main():
         df=df, output_path=args.output_path)
     plot_topology(node_infos=node_infos, coordinates=coords,
                   output_path=args.output_path)
-    plot_avg_msg_sent_all_nodes_over_time(df=df, output_path=args.output_path)
+    plot_avg_msg_sent_all_nodes_over_time(
+        df=df, output_path=args.output_path)
     # plotConfigMapAndConnections(node_positions, node_ids, parent_edges,
     #                             landmarks, latencies, args.output_path)
+
+    df.to_csv(f"{args.output_path}stats.csv")
+    with open(f'{args.output_path}node_infos.json', 'w') as outfile:
+        json.dump(node_infos.copy(), outfile,  default=myconverter)
+
+
+def myconverter(o):
+    if isinstance(o, datetime.datetime):
+        return o.__str__()
 
 
 if __name__ == "__main__":

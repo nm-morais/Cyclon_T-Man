@@ -22,6 +22,11 @@ if [ -z $LATENCY_MAP ]; then
   exit
 fi
 
+if [ -z $SWARM_VOL_DIR ]; then
+  echo "Pls specify env var SWARM_VOL_DIR"
+  exit
+fi
+
 echo "SWARM_NET: $SWARM_NET"
 echo "DOCKER_IMAGE: $DOCKER_IMAGE"
 echo "IPS_FILE: $IPS_FILE"
@@ -40,9 +45,9 @@ fi
 bootstrap_peer_full_line=$(head -n 1 $IPS_FILE)
 bootstrap_peer=$(echo "$bootstrap_peer_full_line" | cut -d' ' -f 1)
 
-
 i=0
 echo "number of nodes: $n_nodes"
+nContainers=$(wc -l $IPS_FILE)
 echo "Lauching containers..."
 while read -r ip name
 do
@@ -52,7 +57,8 @@ do
   idx=$((idx+1))
   node=${!idx}
 
-  cmd="docker run -v $SWARM_VOL:/tmp/logs -d -t --cap-add=NET_ADMIN \
+  cmd="docker run -v $SWARM_VOL_DIR:/tmp/logs -d -t --cap-add=NET_ADMIN \
+   -e config='/config/exampleConfig.yml' \
    --net $SWARM_NET \
    --ip $ip \
    --name $name \
