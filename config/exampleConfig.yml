@@ -11,10 +11,10 @@ bootstrapPeers:
     analyticsPort: 1300
 dialTimeoutMiliseconds: 8000
 logFolder: /tmp/logs/
-shuffleTimerSeconds: 7
+shuffleTimerSeconds: 3
 debugTimerDurationSeconds: 5
 l: 5
 cacheViewSize: 13
-tManViewSize: 7
+tManViewSize: 5
 tManFanout: 4
-tManTimerSeconds: 10
+tManTimerSeconds: 5
