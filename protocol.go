@@ -125,9 +125,9 @@ func (c *CyclonTMan) Start() {
 			}, false)
 		}
 	}
-	c.babel.RegisterPeriodicTimer(c.ID(), DebugTimer{duration: time.Duration(5 * time.Second)})
-	c.babel.RegisterPeriodicTimer(c.ID(), ShuffleTimer{duration: time.Duration(c.conf.ShuffleTimeSeconds) * time.Second})
-	c.babel.RegisterPeriodicTimer(c.ID(), GossipTimer{time.Duration(c.conf.TManTimerSeconds) * time.Second})
+	c.babel.RegisterPeriodicTimer(c.ID(), DebugTimer{duration: time.Duration(5 * time.Second)}, false)
+	c.babel.RegisterPeriodicTimer(c.ID(), GossipTimer{time.Duration(c.conf.TManTimerSeconds) * time.Second}, false)
+	c.babel.RegisterPeriodicTimer(c.ID(), ShuffleTimer{duration: time.Duration(c.conf.ShuffleTimeSeconds) * time.Second}, true)
 }
 
 // ---------------- Cyclon----------------
