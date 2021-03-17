@@ -17,10 +17,10 @@ import (
 )
 
 var (
-	randomPort *bool
+	randomPort          *bool
 	randomAnalyticsPort *bool
-	bootstraps *string
-	listenIP   *string
+	bootstraps          *string
+	listenIP            *string
 )
 
 func main() {
