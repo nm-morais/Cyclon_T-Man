@@ -42,9 +42,6 @@ if [[ $n_nodes -eq 0 ]]; then
   exit
 fi
 
-bootstrap_peer_full_line=$(head -n 1 $IPS_FILE)
-bootstrap_peer=$(echo "$bootstrap_peer_full_line" | cut -d' ' -f 1)
-
 i=0
 echo "number of nodes: $n_nodes"
 nContainers=$(wc -l $IPS_FILE)
@@ -62,7 +59,7 @@ do
    --net $SWARM_NET \
    --ip $ip \
    --name $name \
-    $DOCKER_IMAGE $i $nContainers -bootstraps=\"$bootstrap_peer\" -listenIP=\"$ip\" "
+    $DOCKER_IMAGE $i $nContainers -bootstraps=\"$BOOTSTRAPS\" -listenIP=\"$ip\" "
 
   # echo "running command: '$cmd'"
 

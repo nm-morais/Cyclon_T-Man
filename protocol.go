@@ -117,17 +117,19 @@ func (c *CyclonTMan) Init() {
 
 func (c *CyclonTMan) Start() {
 	c.logger.Infof("Starting with confs: %+v", c.conf)
-	if !c.selfIsBootstrap {
-		for _, bootstrap := range c.bootstrapNodes {
-			c.cyclonView.add(&PeerState{
-				Peer: bootstrap,
-				age:  0,
-			}, false)
-		}
-	}
 	c.babel.RegisterPeriodicTimer(c.ID(), DebugTimer{duration: time.Duration(5 * time.Second)}, false)
 	c.babel.RegisterPeriodicTimer(c.ID(), GossipTimer{time.Duration(c.conf.TManTimerSeconds) * time.Second}, false)
 	c.babel.RegisterPeriodicTimer(c.ID(), ShuffleTimer{duration: time.Duration(c.conf.ShuffleTimeSeconds) * time.Second}, true)
+	for _, bootstrap := range c.bootstrapNodes {
+		if peer.PeersEqual(bootstrap, c.babel.SelfPeer()) {
+			continue
+		}
+		c.cyclonView.add(&PeerState{
+			Peer: bootstrap,
+			age:  0,
+		}, false)
+		return
+	}
 }
 
 // ---------------- Cyclon----------------
