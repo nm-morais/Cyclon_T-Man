@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -e
+nContainers=$1
+shift 1
 
 if [ -z $SWARM_NET ]; then
   echo "Pls specify env var SWARM_NET"
@@ -44,9 +45,8 @@ fi
 
 i=0
 echo "number of nodes: $n_nodes"
-nContainers=$(wc -l $IPS_FILE)
 echo "Lauching containers..."
-while read -r ip name
+while read -r ip name bw
 do
   echo "ip: $ip"
   echo "name: $name"
@@ -54,12 +54,12 @@ do
   idx=$((idx+1))
   node=${!idx}
 
-  cmd="docker run -v $SWARM_VOL_DIR:/tmp/logs -d -t --cap-add=NET_ADMIN \
+  cmd="docker run -v $SWARM_VOL_DIR:/tmp/logs -v /lib/modules:/lib/modules -d -t --privileged --cap-add=ALL \
    -e config='/config/exampleConfig.yml' \
    --net $SWARM_NET \
    --ip $ip \
    --name $name \
-    $DOCKER_IMAGE $i $nContainers -bootstraps=\"$BOOTSTRAPS\" -listenIP=\"$ip\" "
+    $DOCKER_IMAGE $i $nContainers $bw -bootstraps=\"$BOOTSTRAPS\" -listenIP=\"$ip\""
 
   # echo "running command: '$cmd'"
 

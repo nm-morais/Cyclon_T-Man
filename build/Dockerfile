@@ -8,7 +8,7 @@ RUN GOOS=linux GOARCH=amd64 go build -o /go/bin/CyclonTMan *.go
 
 
 FROM debian:stable-slim as cyclon_tman
-RUN apt update 2>/dev/null | grep -P "\d\K upgraded" ; apt install iproute2 -y 2>/dev/null
+RUN apt update 2>/dev/null | grep -P "\d\K upgraded" ; apt install iproute2 -y 2>/dev/null; apt install kmod -y 2>/dev/null
 COPY scripts/setupTc.sh /setupTc.sh
 COPY build/docker-entrypoint.sh /docker-entrypoint.sh
 COPY --from=builder /go/bin/CyclonTMan /go/bin/CyclonTMan
