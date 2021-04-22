@@ -89,14 +89,6 @@ func (v *View) remove(p peer.Peer) (existed bool) {
 	return existed
 }
 
-func (v *View) get(p fmt.Stringer) (*PeerState, bool) {
-	elem, exists := v.asMap[p.String()]
-	if !exists {
-		return nil, false
-	}
-	return elem, exists
-}
-
 func (v *View) isFull() bool {
 	return len(v.asArr) >= v.capacity
 }

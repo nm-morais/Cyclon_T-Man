@@ -155,9 +155,7 @@ func (c *CyclonTMan) HandleShuffleTimer(t timer.Timer) {
 	sort.Sort(viewAsArr)
 	q := viewAsArr[0]
 	c.logger.Infof("Oldest level peer: %s:%d", q.Peer.String(), q.age)
-	if _, ok := c.pendingCyclonExchanges[q.String()]; ok {
-		delete(c.pendingCyclonExchanges, q.String())
-	}
+	delete(c.pendingCyclonExchanges, q.String())
 	subset := append(c.cyclonView.getRandomElementsFromView(c.conf.L-1, q), &PeerState{
 		Peer: c.babel.SelfPeer(),
 		age:  0,
@@ -322,6 +320,11 @@ func (c *CyclonTMan) handlePeerMeasuredNotification(n notification.Notification)
 	c.tManView.asArr = append(c.tManView.asArr, aux)
 	sort.SliceStable(c.tManView.asArr, func(i, j int) bool { return c.tManView.asArr[i].age < c.tManView.asArr[j].age })
 	if len(c.tManView.asArr) > c.tManView.capacity {
+		toRemove := c.tManView.asArr[len(c.tManView.asArr)-1]
+		if !peer.PeersEqual(toRemove.Peer, aux.Peer) {
+			c.babel.SendNotification(NeighborDownNotification{PeerDown: toRemove})
+			c.babel.SendNotification(NeighborUpNotification{PeerUp: aux})
+		}
 		c.tManView.asArr = c.tManView.asArr[:c.tManView.capacity]
 	}
 	c.logTManState()

@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 
 	babel "github.com/nm-morais/go-babel/pkg"
 	"github.com/nm-morais/go-babel/pkg/peer"
-	"github.com/ungerik/go-dry"
 	"gopkg.in/yaml.v2"
 )
 
@@ -21,6 +19,7 @@ var (
 	randomAnalyticsPort *bool
 	bootstraps          *string
 	listenIP            *string
+	confFilePath        *string
 )
 
 func main() {
@@ -30,13 +29,13 @@ func main() {
 
 	randomPort = flag.Bool("rport", false, "choose random port")
 	randomAnalyticsPort = flag.Bool("raport", false, "choose random analytics port")
-
+	confFilePath = flag.String("conf", "config/exampleConfig.yml", "specify conf file path")
 	bootstraps = flag.String("bootstraps", "", "choose custom bootstrap nodes (space-separated ip:port list)")
 	listenIP = flag.String("listenIP", "", "choose custom ip to listen to")
 
 	flag.Parse()
 
-	conf := readConfFile()
+	conf := readConfFile(*confFilePath)
 
 	if *randomPort {
 		fmt.Println("Setting custom port")
@@ -114,14 +113,8 @@ func main() {
 	p.StartSync()
 }
 
-func readConfFile() *CyclonTManConfig {
-	configFileName := "config/exampleConfig.yml"
-	envVars := dry.EnvironMap()
-	customConfig, ok := envVars["config"]
-	if ok {
-		configFileName = customConfig
-	}
-	f, err := os.Open(configFileName)
+func readConfFile(path string) *CyclonTManConfig {
+	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}
@@ -146,18 +139,6 @@ func GetFreePort() (port int, err error) {
 		}
 	}
 	return
-}
-
-func GetOutboundIP() net.IP {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close()
-
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP
 }
 
 func ParseBootstrapArg(arg *string, conf *CyclonTManConfig) {
