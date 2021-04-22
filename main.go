@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nm-morais/Cyclon_T-Man/protocol"
 	babel "github.com/nm-morais/go-babel/pkg"
 	"github.com/nm-morais/go-babel/pkg/peer"
 	"gopkg.in/yaml.v2"
@@ -109,18 +110,18 @@ func main() {
 	p.RegisterNodeWatcher(nw)
 	p.RegisterListenAddr(&net.TCPAddr{IP: protoManagerConf.Peer.IP(), Port: int(protoManagerConf.Peer.ProtosPort())})
 	p.RegisterListenAddr(&net.UDPAddr{IP: protoManagerConf.Peer.IP(), Port: int(protoManagerConf.Peer.ProtosPort())})
-	p.RegisterProtocol(NewCyclonTManProtocol(p, nw, conf))
+	p.RegisterProtocol(protocol.NewCyclonTManProtocol(p, nw, conf))
 	p.StartSync()
 }
 
-func readConfFile(path string) *CyclonTManConfig {
+func readConfFile(path string) *protocol.CyclonTManConfig {
 	f, err := os.Open(path)
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 
-	cfg := &CyclonTManConfig{}
+	cfg := &protocol.CyclonTManConfig{}
 	decoder := yaml.NewDecoder(f)
 	err = decoder.Decode(cfg)
 	if err != nil {
@@ -141,7 +142,7 @@ func GetFreePort() (port int, err error) {
 	return
 }
 
-func ParseBootstrapArg(arg *string, conf *CyclonTManConfig) {
+func ParseBootstrapArg(arg *string, conf *protocol.CyclonTManConfig) {
 	if arg != nil && *arg != "" {
 		bootstrapPeers := []struct {
 			Port          int    `yaml:"port"`
