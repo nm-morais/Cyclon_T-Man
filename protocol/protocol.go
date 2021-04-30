@@ -322,12 +322,26 @@ func (c *CyclonTMan) handlePeerMeasuredNotification(n notification.Notification)
 	if len(c.tManView.asArr) > c.tManView.capacity {
 		toRemove := c.tManView.asArr[len(c.tManView.asArr)-1]
 		if !peer.PeersEqual(toRemove.Peer, aux.Peer) {
-			c.babel.SendNotification(NeighborDownNotification{PeerDown: toRemove})
-			c.babel.SendNotification(NeighborUpNotification{PeerUp: aux})
+			c.babel.SendNotification(NeighborDownNotification{
+				PeerDown: toRemove,
+				View:     c.getView(),
+			})
+			c.babel.SendNotification(NeighborUpNotification{
+				PeerUp: aux,
+				View:   c.getView(),
+			})
 		}
 		c.tManView.asArr = c.tManView.asArr[:c.tManView.capacity]
 	}
 	c.logTManState()
+}
+
+func (c *CyclonTMan) getView() map[string]peer.Peer {
+	toRet := map[string]peer.Peer{}
+	for _, p := range c.tManView.asArr {
+		toRet[p.String()] = p
+	}
+	return toRet
 }
 
 func (c *CyclonTMan) issueMeasurementsFor(peers []peer.Peer) {
