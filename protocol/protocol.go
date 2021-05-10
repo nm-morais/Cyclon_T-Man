@@ -332,6 +332,11 @@ func (c *CyclonTMan) handlePeerMeasuredNotification(n notification.Notification)
 			})
 		}
 		c.tManView.asArr = c.tManView.asArr[:c.tManView.capacity]
+	} else {
+		c.babel.SendNotification(NeighborUpNotification{
+			PeerUp: aux,
+			View:   c.getView(),
+		})
 	}
 	c.logTManState()
 }
