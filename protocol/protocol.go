@@ -124,6 +124,10 @@ func (c *CyclonTMan) Start() {
 		if peer.PeersEqual(bootstrap, c.babel.SelfPeer()) {
 			continue
 		}
+		if c.cyclonView.isFull() {
+			break
+		}
+
 		c.cyclonView.add(&PeerState{
 			Peer: bootstrap,
 			age:  0,
@@ -141,6 +145,9 @@ func (c *CyclonTMan) HandleShuffleTimer(t timer.Timer) {
 		}
 		c.logger.Warn("Had no neighbors in shuffle reply, adding bootstrap peer")
 		for _, bootstrap := range c.bootstrapNodes {
+			if c.cyclonView.isFull() {
+				break
+			}
 			c.cyclonView.add(&PeerState{
 				Peer: bootstrap,
 				age:  0,

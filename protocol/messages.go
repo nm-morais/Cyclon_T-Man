@@ -7,7 +7,7 @@ import (
 	"github.com/nm-morais/go-babel/pkg/peer"
 )
 
-const ShuffleMessageType = 2000
+const ShuffleMessageType = 1600
 
 type ShuffleMessage struct {
 	peers []peer.Peer
@@ -70,7 +70,7 @@ func (sr ShuffleMessage) ToPeerStateArr() (peers []*PeerState) {
 	return peers
 }
 
-const ShuffleMessageReplyType = 2001
+const ShuffleMessageReplyType = 1601
 
 type ShuffleMessageReply struct {
 	peers []peer.Peer
@@ -135,7 +135,7 @@ func (sr ShuffleMessageReply) ToPeerStateArr() (peers []*PeerState) {
 	return peers
 }
 
-const TManGossipMsgType = 2002
+const TManGossipMsgType = 1602
 
 type TManGossipMsg struct {
 	peers []peer.Peer
@@ -166,7 +166,7 @@ func (TManGossipMsgSerializer) Deserialize(msgBytes []byte) message.Message {
 	}
 }
 
-const tManGossipMsgReplyType = 2003
+const tManGossipMsgReplyType = 1603
 
 type tManGossipMsgReply struct {
 	peers []peer.Peer
